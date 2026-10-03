@@ -150,11 +150,11 @@ fn prelude_globals(builder: &mut GlobalsBuilder) {
     /// cache key, so a different `DEVELOPER_DIR` resolves to a
     /// different cached result. When set, `cwd` must be absolute.
     ///
-    /// Standard output and standard error are each capped at the default
-    /// analysis limit. Pass `max_output_bytes` to raise that bound for a
-    /// command whose answer is inherently large, such as a build system's
-    /// action graph. The bound is part of the recorded observation, so a
-    /// later validation re-runs the command under the same bound.
+    /// The captured output is capped at the default analysis limit. Pass
+    /// `max_output_bytes` to raise that bound for a command whose answer is
+    /// inherently large, such as a build system's action graph. The bound is
+    /// part of the recorded observation, so a later validation re-runs the
+    /// command under the same bound.
     /// Schema parsing returns `""`.
     fn host_command<'v>(
         argv: Value<'v>,

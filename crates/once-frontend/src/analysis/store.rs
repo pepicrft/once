@@ -846,9 +846,10 @@ impl HostCache {
     /// still returns the captured output. Callers that tolerate failure use
     /// it for idempotent setup whose success they verify with a later probe.
     ///
-    /// `max_output_bytes` bounds each captured stream. The default keeps
+    /// `max_output_bytes` bounds the captured output. The default keeps
     /// discovery commands small; a command whose answer is inherently large
-    /// (a build-system action graph, for example) raises it deliberately.
+    /// (a build-system action graph, for example) raises it deliberately. The
+    /// bound applies to each stream while capturing and to the merged result.
     pub(super) fn command_checked(
         &self,
         argv: &[String],
