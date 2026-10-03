@@ -119,6 +119,7 @@ defmodule OnceSiteWeb.Docs.Sidebar do
         label: "Infrastructure",
         items: [
           %Item{label: "Overview", slug: "/docs/guide/infrastructure"},
+          %Item{label: "Connect A Project", slug: "/docs/guide/infrastructure/connect"},
           %Item{label: "Remote Execution", slug: "/docs/guide/infrastructure/remote-execution"},
           %Item{
             label: "Microsandbox",
@@ -182,6 +183,7 @@ defmodule OnceSiteWeb.Docs.Sidebar do
           %Item{label: "auth", slug: "/docs/reference/cli/auth"},
           %Item{label: "build", slug: "/docs/reference/cli/build"},
           %Item{label: "cache", slug: "/docs/reference/cli/cache"},
+          %Item{label: "connect", slug: "/docs/reference/cli/connect"},
           %Item{label: "edit", slug: "/docs/reference/cli/edit"},
           %Item{label: "exec", slug: "/docs/reference/cli/exec"},
           %Item{label: "lint", slug: "/docs/reference/cli/lint"},

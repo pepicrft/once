@@ -33,8 +33,8 @@ pub use error::{Error, Result};
 pub use model::{ActionResult, Stats};
 pub use provider::CacheProvider;
 pub use tuist::{
-    TuistAuth, TuistAuthPrompt, TuistCacheConfig, TUIST_APP_OAUTH_CLIENT_ID,
-    TUIST_OAUTH_CLIENT_ID_ENV,
+    ProjectCreateError, RemoteProject, TuistAuth, TuistAuthPrompt, TuistCacheConfig, TuistProjects,
+    TUIST_APP_OAUTH_CLIENT_ID, TUIST_OAUTH_CLIENT_ID_ENV,
 };
 
 /// Local content-addressed store rooted at a workspace `.once/`

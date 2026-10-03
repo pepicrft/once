@@ -107,5 +107,6 @@ or its declared input causes the work to run again.
   normalized findings with an explicit failure policy.
 - Continue with the [software development kit overview](/guide/sdk/) when an
   application needs direct access to Once cache primitives.
-- Read [Infrastructure](/guide/infrastructure/) after the local flow works
-  and you are ready to share cache entries or run actions remotely.
+- Read [Connect A Project](/guide/infrastructure/connect) when you are ready to
+  create a remote project and share cache entries with your team, or
+  [Infrastructure](/guide/infrastructure/) to run actions on another machine.

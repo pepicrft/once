@@ -4,6 +4,19 @@
 Configure it when developers and coding agents should reuse the same action
 results.
 
+## Create And Connect A Project
+
+Provision a Tuist project and bind this repository to it in one command:
+
+```sh
+once connect --provider tuist --create
+```
+
+Once signs you in when needed, creates the project under your personal account,
+and writes the provider binding into the repository root `once.toml`. Read
+[Connect A Project](/guide/infrastructure/connect) for account and project
+selection. The result is the same configuration described below.
+
 ## Configure The Cache
 
 Add a Tuist provider and cache binding to the repository root `once.toml`:
