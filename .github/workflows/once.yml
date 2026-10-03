@@ -148,7 +148,7 @@ jobs:
       # Selecting by the `crates` path schedules every Rust test target in
       # one run and leaves the website tests to the web workflow.
       - name: Test with Once
-        run: '"${{ steps.bootstrap.outputs.bin }}" -v test --changed-path crates'
+        run: '"${{ steps.bootstrap.outputs.bin }}" test --changed-path crates'
         env:
           ONCE_CACHE_PROVIDER: ${{ steps.once-cache-auth.outcome == 'success' && 'tuist' || 'local' }}
 
