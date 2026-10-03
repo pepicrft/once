@@ -91,6 +91,11 @@ defmodule OnceSiteWeb.Docs.Sidebar do
           %Item{label: "Bazel", slug: "/docs/guide/graph/bazel", icon: "bazel"},
           %Item{label: "C and C++", slug: "/docs/guide/graph/c", icon: "cplusplus"},
           %Item{label: "CMake", slug: "/docs/guide/graph/cmake", icon: "cplusplus"},
+          %Item{
+            label: "Container Images",
+            slug: "/docs/guide/graph/containers",
+            icon: "containers"
+          },
           %Item{label: "Elixir", slug: "/docs/guide/graph/elixir", icon: "elixir"},
           %Item{label: "Go", slug: "/docs/guide/graph/go", icon: "go"},
           %Item{label: "Kotlin", slug: "/docs/guide/graph/kotlin", icon: "kotlin"},
