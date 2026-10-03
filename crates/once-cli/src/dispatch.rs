@@ -112,6 +112,26 @@ async fn run_command(
     }
     match command {
         Cmd::Auth { cmd } => run_auth_command(workspace, xdg, output, cmd).await,
+        Cmd::Connect {
+            provider,
+            account,
+            project,
+            create,
+            dry_run,
+        } => commands::connect::connect(
+            workspace,
+            xdg,
+            output,
+            commands::connect::ConnectArgs {
+                provider,
+                account,
+                project,
+                create,
+                dry_run,
+            },
+        )
+        .await
+        .map(|()| ExitCode::SUCCESS),
         Cmd::Build {
             target,
             sandbox,

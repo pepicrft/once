@@ -496,6 +496,38 @@ pub enum Cmd {
         cmd: Option<AuthCmd>,
     },
 
+    /// Provision a remote project and bind this workspace to it.
+    ///
+    /// Resolves an infrastructure provider by name, asks it to create or
+    /// select a project, and records the provider binding in the root
+    /// `once.toml` under `[infrastructures.<name>]` plus
+    /// `[infrastructure.cache]`. Provider protocol details stay behind the
+    /// provider, so a project is provisioned without coupling Once to any
+    /// one host.
+    Connect {
+        /// Provider reference, resolved like `once auth login --provider`.
+        #[usage(long)]
+        provider: String,
+
+        /// Account or organization that owns the project.
+        #[usage(long)]
+        account: Option<String>,
+
+        /// Project handle. Defaults to the workspace directory name when
+        /// `--create` is set.
+        #[usage(long)]
+        project: Option<String>,
+
+        /// Create the project when it does not exist, instead of only
+        /// binding an existing one.
+        #[usage(long)]
+        create: bool,
+
+        /// Print the binding without writing `once.toml`.
+        #[usage(long)]
+        dry_run: bool,
+    },
+
     /// Inspect the project toolchain contract.
     ///
     /// Reports the toolchains a project pins (Rust, Swift, mise) and
@@ -752,6 +784,7 @@ impl Cmd {
                 }
                 path
             }
+            Self::Connect { .. } => vec!["connect"],
             Self::Toolchain { cmd } => {
                 let mut path = vec!["toolchain"];
                 if let Some(cmd) = cmd {

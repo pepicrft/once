@@ -8,6 +8,7 @@ pub mod cache;
 pub mod cargo;
 pub mod change_tracker;
 pub mod compatibility;
+pub mod connect;
 pub mod edit;
 pub mod evidence;
 pub mod exec;
