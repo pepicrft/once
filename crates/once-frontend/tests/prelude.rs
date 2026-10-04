@@ -9802,6 +9802,39 @@ result = repr(commands[0])
     assert!(out.ends_with(", \"/workspace\"]"), "{out}");
 }
 
+/// Once must not trust `cargo metadata`'s per-package feature union, which
+/// includes backends gated to other platforms. It recomputes the set from the
+/// platform-gated dependency entries and the feature table.
+#[test]
+fn prelude_cargo_platform_features_drop_other_platform_backends() {
+    let prelude = all_prelude_source();
+    let source = format!(
+        r#"{prelude}
+metadata = {{
+    "workspace_members": ["root-id"],
+    "packages": [
+        {{"id": "root-id", "name": "root", "version": "0.1.0", "features": {{"default": []}}, "dependencies": [
+            {{"name": "keyring", "features": ["crypto-rust"], "uses_default_features": False, "target": None}},
+            {{"name": "keyring", "features": ["linux-native-async-persistent"], "uses_default_features": False, "target": "cfg(target_os = \"linux\")"}},
+            {{"name": "keyring", "features": ["apple-native"], "uses_default_features": False, "target": "cfg(target_os = \"macos\")"}},
+        ]}},
+        {{"id": "keyring-id", "name": "keyring", "version": "3.6.3", "features": {{"apple-native": [], "crypto-rust": []}}, "dependencies": []}},
+    ],
+    "resolve": {{"nodes": [
+        {{"id": "root-id", "deps": [{{"name": "keyring", "pkg": "keyring-id", "dep_kinds": []}}], "features": []}},
+        {{"id": "keyring-id", "deps": [], "features": ["apple-native", "async-secret-service", "crypto-rust", "linux-native", "sync-secret-service"]}},
+    ]}},
+}}
+active = _cargo_platform_features(metadata, "aarch64-apple-darwin", [], False, False)
+_cargo_apply_platform_features(metadata, active)
+result = repr([node["features"] for node in metadata["resolve"]["nodes"]])
+"#
+    );
+    let out = eval_prelude_source_to_repr(source).unwrap();
+
+    assert_eq!(out, "[[\"default\"], [\"apple-native\", \"crypto-rust\"]]");
+}
+
 #[test]
 fn prelude_cargo_explicit_targets_scope_generated_names() {
     let prelude = all_prelude_source();

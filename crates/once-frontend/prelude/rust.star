@@ -2364,9 +2364,11 @@ def _cargo_resolved_metadata(ctx, default_vendor_dir = "third_party/rust/vendor"
         cargo = host_which("cargo")
         filter_platform = target or host_triple
         metadata = _cargo_metadata_for_platform(ctx, cargo, manifest, filter_platform)
+        _cargo_apply_platform_features(metadata, _cargo_platform_features(metadata, filter_platform, _rust_attr(ctx, "features", []), _rust_attr(ctx, "all_features", False), _rust_attr(ctx, "no_default_features", False)))
         host_metadata = None
         if target and target != host_triple:
             host_metadata = _cargo_metadata_for_platform(ctx, cargo, manifest, host_triple)
+            _cargo_apply_platform_features(host_metadata, _cargo_platform_features(host_metadata, host_triple, _rust_attr(ctx, "features", []), _rust_attr(ctx, "all_features", False), _rust_attr(ctx, "no_default_features", False)))
     lock = _cargo_lock_document(ctx, metadata)
     _cargo_attach_locked_checksums(metadata, lock)
     if host_metadata != None:
@@ -2683,6 +2685,193 @@ def _cargo_metadata_for_platform(ctx, cargo, manifest, platform):
         cwd = workspace_root(),
     )
     return json_decode(metadata_content)
+
+# `cargo metadata` reports one feature list per package that unions every
+# target, so a crate with mutually exclusive platform backends (`keyring`
+# refuses to compile with both a sync and an async credential store) arrives
+# with all of them. Cargo's own resolver has already filtered them for the
+# target, but neither `cargo metadata` nor `cargo tree` exposes that filtered
+# view reliably, so Once recomputes it from the platform-gated dependency
+# entries and the feature table.
+_CARGO_UNIX_OSES = ["macos", "linux", "freebsd", "openbsd", "netbsd", "dragonfly", "solaris", "illumos", "android", "ios"]
+_CARGO_VENDORS = ["apple", "pc", "unknown", "fortanix", "nintendo", "sony", "wrs", "sun", "ibm", "nvidia"]
+_CARGO_OSES = ["darwin", "ios", "tvos", "watchos", "visionos", "linux", "windows", "freebsd", "openbsd", "netbsd", "dragonfly", "solaris", "illumos", "android", "wasi", "emscripten", "fuchsia"]
+_CARGO_ENVS = ["gnu", "musl", "msvc", "gnullvm", "uclibc", "sgx", "newlib", "eabi", "eabihf", "ohos"]
+
+def _cargo_cfg_context(platform):
+    parts = platform.split("-")
+    context = {"arch": parts[0] if parts else "", "os": "", "env": "", "vendor": "", "family": ""}
+    for part in parts[1:]:
+        if part == "darwin":
+            context["os"] = "macos"
+        elif part in _CARGO_OSES:
+            context["os"] = part
+        elif part in _CARGO_VENDORS:
+            context["vendor"] = part
+        elif part in _CARGO_ENVS:
+            context["env"] = part
+    context["unix"] = context["os"] in _CARGO_UNIX_OSES
+    context["windows"] = context["os"] == "windows"
+    if context["unix"]:
+        context["family"] = "unix"
+    elif context["windows"]:
+        context["family"] = "windows"
+    return context
+
+def _cargo_split_top_level(text):
+    parts = []
+    depth = 0
+    current = ""
+    in_string = False
+    for index in range(len(text)):
+        char = text[index]
+        if char == '"':
+            in_string = not in_string
+            current += char
+        elif in_string:
+            current += char
+        elif char == "(":
+            depth += 1
+            current += char
+        elif char == ")":
+            depth -= 1
+            current += char
+        elif char == "," and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+    current = current.strip()
+    if current:
+        parts.append(current)
+    return [part.strip() for part in parts if part.strip()]
+
+def _cargo_cfg_expr_matches(expr, context):
+    expr = expr.strip()
+    if expr.startswith("all("):
+        for part in _cargo_split_top_level(expr[4:-1]):
+            if not _cargo_cfg_expr_matches(part, context):
+                return False
+        return True
+    if expr.startswith("any("):
+        for part in _cargo_split_top_level(expr[4:-1]):
+            if _cargo_cfg_expr_matches(part, context):
+                return True
+        return False
+    if expr.startswith("not("):
+        return not _cargo_cfg_expr_matches(expr[4:-1], context)
+    if "=" in expr:
+        key, _, value = expr.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"')
+        if key == "target_os":
+            return context["os"] == value
+        if key == "target_arch":
+            return context["arch"] == value
+        if key == "target_family":
+            return context["family"] == value
+        if key == "target_env":
+            return context["env"] == value
+        if key == "target_vendor":
+            return context["vendor"] == value
+        return False
+    if expr == "unix":
+        return context["unix"]
+    if expr == "windows":
+        return context["windows"]
+    return False
+
+def _cargo_target_matches(target, context):
+    if target == None or target == "":
+        return True
+    expr = target.strip()
+    if not (expr.startswith("cfg(") and expr.endswith(")")):
+        return False
+    return _cargo_cfg_expr_matches(expr[4:-1], context)
+
+# Resolve the features Cargo would actually enable for `platform`, starting
+# from the workspace members and walking the platform-gated dependency entries
+# and the feature table. Returns `{}` when feature selection is not
+# reproducible, in which case the metadata features stand.
+def _cargo_platform_features(metadata, platform, seed_features, all_features, no_default_features):
+    if all_features:
+        return {}
+    context = _cargo_cfg_context(platform)
+    packages = {}
+    for package in metadata.get("packages") or []:
+        packages[package["id"]] = package
+    nodes = {}
+    for node in (metadata.get("resolve") or {}).get("nodes") or []:
+        nodes[node["id"]] = node
+    active = {}
+    for member in metadata.get("workspace_members") or []:
+        if not no_default_features:
+            _cargo_enable_feature(active, member, "default")
+        for feature in seed_features:
+            _cargo_enable_feature(active, member, feature)
+    for node in nodes.values():
+        package = packages.get(node["id"])
+        if package == None:
+            continue
+        for dependency in node.get("deps") or []:
+            target = packages.get(dependency["pkg"])
+            if target == None:
+                continue
+            for entry in package.get("dependencies") or []:
+                if entry.get("name") != target.get("name"):
+                    continue
+                if not _cargo_target_matches(entry.get("target"), context):
+                    continue
+                if entry.get("uses_default_features"):
+                    _cargo_enable_feature(active, dependency["pkg"], "default")
+                for feature in entry.get("features") or []:
+                    _cargo_enable_feature(active, dependency["pkg"], feature)
+    for _ in range(64):
+        changed = False
+        for package_id in list(active.keys()):
+            package = packages.get(package_id)
+            if package == None:
+                continue
+            node = nodes.get(package_id)
+            deps_by_name = {}
+            if node != None:
+                for dependency in node.get("deps") or []:
+                    deps_by_name[dependency["name"]] = dependency["pkg"]
+            table = package.get("features") or {}
+            for feature in list(active[package_id].keys()):
+                for implied in table.get(feature) or []:
+                    if implied.startswith("dep:"):
+                        continue
+                    if "/" in implied:
+                        name, _, nested = implied.partition("/")
+                        dependency_id = deps_by_name.get(name.rstrip("?"))
+                        if dependency_id != None and _cargo_enable_feature(active, dependency_id, nested):
+                            changed = True
+                        continue
+                    if _cargo_enable_feature(active, package_id, implied):
+                        changed = True
+        if not changed:
+            break
+    return active
+
+def _cargo_enable_feature(active, package_id, feature):
+    enabled = active.get(package_id)
+    if enabled == None:
+        enabled = {}
+        active[package_id] = enabled
+    if enabled.get(feature):
+        return False
+    enabled[feature] = True
+    return True
+
+def _cargo_apply_platform_features(metadata, active):
+    if not active:
+        return
+    for node in (metadata.get("resolve") or {}).get("nodes") or []:
+        features = active.get(node["id"])
+        if features == None:
+            continue
+        node["features"] = sorted(features.keys())
 
 def _cargo_resolver_config(ctx):
     files = ctx.get("files") or {}
